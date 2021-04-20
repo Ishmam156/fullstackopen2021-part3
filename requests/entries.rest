@@ -1,13 +1,15 @@
-GET http://localhost:3001/api/persons/1
+GET https://afternoon-mesa-16188.herokuapp.com/api/persons/3
 
 ###
 GET http://localhost:3001/api/persons/
 
 ###
-DELETE http://localhost:3001/api/persons/1
+GET https://afternoon-mesa-16188.herokuapp.com/api/persons
+###
+DELETE https://afternoon-mesa-16188.herokuapp.com/api/persons/44140
 
 ###
-POST http://localhost:3001/api/persons/
+POST https://afternoon-mesa-16188.herokuapp.com/api/persons
 Content-Type: application/json
 
 {
@@ -16,7 +18,7 @@ Content-Type: application/json
 }
 
 ###
-POST http://localhost:3001/api/persons/
+POST https://afternoon-mesa-16188.herokuapp.com/api/persons
 Content-Type: application/json
 
 {

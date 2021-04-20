@@ -5,6 +5,7 @@ const cors = require('cors')
 const app = express()
 app.use(express.json())
 app.use(cors())
+app.use(express.static('build'))
 
 // Custom token to get content body for POST method
 morgan.token('content', function (req, res) {
