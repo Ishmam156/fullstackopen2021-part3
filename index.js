@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express')
 var morgan = require('morgan')
 const cors = require('cors')
@@ -6,6 +8,10 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 app.use(express.static('build'))
+
+// Load mongoDB with model
+const Person = require('./models/person');
+const { response } = require('express');
 
 // Custom token to get content body for POST method
 morgan.token('content', function (req, res) {
@@ -19,29 +25,6 @@ morgan.token('content', function (req, res) {
 })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
 
-let persons = [
-    {
-        "name": "Arto Hellas",
-        "number": "040-123456",
-        "id": 1
-    },
-    {
-        "name": "Ada Lovelace",
-        "number": "39-44-5323523",
-        "id": 2
-    },
-    {
-        "name": "Dan Abramov",
-        "number": "12-43-234345",
-        "id": 3
-    },
-    {
-        "name": "Mary Poppendieck",
-        "number": "39-23-6423122",
-        "id": 4
-    }
-]
-
 // Default Route
 app.get('/', (request, response) => {
     response.send('<h1>Testing Phonebook!</h1>')
@@ -49,62 +32,79 @@ app.get('/', (request, response) => {
 
 // Persons route showing all persons
 app.get('/api/persons', (request, response) => {
-    response.json(persons)
+    Person.find({}).then(persons => response.json(persons))
 })
 
 // Info route showing summary
-app.get('/info', (request, response) => {
-    const currentTime = new Date()
-    response.send(`<p>Phonebook has info for ${persons.length} people.</p><p>${currentTime}</p>`)
+app.get('/info', (request, response, next) => {
+    Person.countDocuments({})
+        .then(result => response.send(`<p>Phonebook has info for ${result} people.</p><p>${new Date()}</p>`))
+        .catch(error => next(error))
 })
 
 // Unique person information
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const number = persons.find(person => person.id === id)
+app.get('/api/persons/:id', (request, response, next) => {
+    Person.findById(request.params.id)
+        .then(person => {
+            if (person) {
+                response.json(person)
+            } else {
+                response.status(404).end()
+            }
+        })
+        .catch(error => next(error))
+})
 
-    if (number) {
-        response.json(number)
-    } else {
-        response.status(404).end()
+// Update phone number
+app.put('/api/persons/:id', (request, response, next) => {
+    const body = { ...request.body }
+
+    const updatePerson = {
+        'number': body.number
     }
+
+    Person.findByIdAndUpdate(request.params.id, updatePerson, { 'new': true, runValidators: true })
+        .then(updatedPerson => response.json(updatedPerson))
+        .catch(error => next(error))
 })
 
 // Delete unique person
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    persons = persons.filter(person => person.id !== id)
-
-    response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+    Person.findByIdAndRemove(request.params.id,)
+        .then(result => response.status(204).end())
+        .catch(error => next(error))
 })
 
 // Add new entry
-app.post('/api/persons', (request, response) => {
-    const newEntry = { ...request.body }
+app.post('/api/persons', (request, response, next) => {
+    const body = { ...request.body }
 
-    // Check for errors
-    if (!newEntry.number) {
-        return response.status(400).json({
-            'error': 'provide number correctly.'
-        })
-    } else if (!newEntry.name) {
-        return response.status(400).json({
-            'error': 'provide name correctly.'
-        })
-    } else if (persons.map(person => person.name).includes(newEntry.name)) {
-        return response.status(400).json({
-            'error': 'name must be unique.'
-        })
-    }
+    const newPerson = new Person({
+        'name': body.name,
+        'number': body.number,
+    })
 
-    // Add ID and concat
-    newEntry.id = Math.floor(Math.random() * 100000)
-    persons = persons.concat(newEntry)
-
-    response.json(newEntry)
+    newPerson.save()
+        .then(savedPerson => response.json(savedPerson))
+        .catch(error => next(error))
 })
 
-const PORT = process.env.PORT || 3001
+// ErrorHandler middleware
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    } else if (error.name === 'ValidationError') {
+        return response.status(400).json({ error: error.message })
+    }
+
+    next(error)
+}
+
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
